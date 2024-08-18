@@ -54,7 +54,7 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:8000/calculate", {
+      const res = await fetch("https://then-canidae-orangecorp-04c092da.koyeb.app/calculate", {
         method: "POST",  // Asegúrate de que el método sea POST
         headers: {
           "Content-Type": "application/json",
