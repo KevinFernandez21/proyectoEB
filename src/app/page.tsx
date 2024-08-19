@@ -1,8 +1,9 @@
 "use client";
 import Image from "next/image";
 import Circuito from "./problema1.jpg";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Line } from "react-chartjs-2";
+import debounce from 'lodash.debounce';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -32,6 +33,11 @@ type ResultsType = {
   IBD: number;
 };
 
+type ChatMessage = {
+  role: "user" | "model";
+  content: string;
+};
+
 export default function Home() {
   const [values, setValues] = useState<ValuesType>({
     R1: "",
@@ -46,6 +52,13 @@ export default function Home() {
 
   const [results, setResults] = useState<ResultsType | null>(null);
   const [selectedResistor, setSelectedResistor] = useState<string>("R1");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [userMessage, setUserMessage] = useState<string>("");
+
+  const debouncedSetUserMessage = useMemo(
+    () => debounce((value: string) => setUserMessage(value), 300),
+    []
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -57,6 +70,10 @@ export default function Home() {
 
   const handleResistorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedResistor(e.target.value);
+  };
+
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    debouncedSetUserMessage(e.target.value);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -71,7 +88,6 @@ export default function Home() {
       });
       const data = await res.json();
 
-      // Limitar los resultados a 3 decimales
       const formattedData = {
         VR1: parseFloat(data.VR1.toFixed(3)),
         VR2: parseFloat(data.VR2.toFixed(3)),
@@ -92,6 +108,34 @@ export default function Home() {
     }
   };
 
+  const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!userMessage || !results) return;
+
+    const newChatHistory = [...chatHistory, { role: "user", content: userMessage }];
+    setChatHistory(newChatHistory);
+
+    try {
+      const res = await fetch("https://then-canidae-orangecorp-04c092da.koyeb.app/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          results: results,
+        }),
+      });
+      const data = await res.json();
+      const modelResponse = data.response;
+
+      setChatHistory((prev) => [...prev, { role: "model", content: modelResponse }]);
+      setUserMessage("");
+    } catch (err) {
+      console.error("Error:", err);
+    }
+  };
+
   const generateGraphPoints = (voltage: number | undefined, resistanceMax: number) => {
     if (voltage === undefined) return { resistances: [], voltages: [], currents: [], powers: [] };
 
@@ -100,15 +144,14 @@ export default function Home() {
     let currents = [];
     let powers = [];
 
-    // Disminuye el incremento para generar más puntos
-    for (let R = 1; R <= resistanceMax; R += 1) {  // Incrementa de 1 en 1 para más puntos
-        const I = voltage / R;
-        const P = voltage * I;
+    for (let R = 1; R <= resistanceMax; R += 1) {
+      const I = voltage / R;
+      const P = voltage * I;
 
-        resistances.push(R);
-        voltages.push(voltage);
-        currents.push(I);
-        powers.push(P);
+      resistances.push(R);
+      voltages.push(voltage);
+      currents.push(I);
+      powers.push(P);
     }
 
     return { resistances, voltages, currents, powers };
@@ -177,16 +220,16 @@ export default function Home() {
         },
         ticks: {
           color: '#ffffff',
-          stepSize: maxValue / 20,  // Aumenta la cantidad de ticks en el eje Y
+          stepSize: maxValue / 20,
         }
       }
     },
     elements: {
       line: {
-        tension: 0.4, // Make the line smooth (curved)
+        tension: 0.4, 
       },
       point: {
-        radius: 0, // Hide points for a cleaner look
+        radius: 0, 
       }
     }
   });
@@ -295,37 +338,71 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <div className="mt-10">
-        <h1 className="text-2xl font-bold mb-5 text-center text-purple-300">Gráficas</h1>
-        <div className="mb-4 text-center">
-          <label className="block text-sm font-bold mb-2 text-yellow-300" htmlFor="resistor-select">
-            Seleccione una resistencia:
-          </label>
-          <select
-            id="resistor-select"
-            value={selectedResistor}
-            onChange={handleResistorChange}
-            className="w-full p-2 bg-gray-700 border border-gray-500 rounded text-center text-yellow-300"
-          >
-            {["R1", "R2", "R3", "R4", "R5"].map((resistor) => (
-              <option key={resistor} value={resistor}>
-                {resistor}
-              </option>
-            ))}
-          </select>
+
+      {results && (
+        <div className="mt-10 w-full">
+          <h1 className="text-2xl font-bold mb-5 text-center text-purple-300">Gráficas</h1>
+          <div className="mb-4 text-center">
+            <label className="block text-sm font-bold mb-2 text-yellow-300" htmlFor="resistor-select">
+              Seleccione una resistencia:
+            </label>
+            <select
+              id="resistor-select"
+              value={selectedResistor}
+              onChange={handleResistorChange}
+              className="w-full p-2 bg-gray-700 border border-gray-500 rounded text-center text-yellow-300"
+            >
+              {["R1", "R2", "R3", "R4", "R5"].map((resistor) => (
+                <option key={resistor} value={resistor}>
+                  {resistor}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="w-full h-64">
+              <Line data={voltageData} options={voltageChartOptions} />
+            </div>
+            <div className="w-full h-64">
+              <Line data={currentData} options={currentChartOptions} />
+            </div>
+            <div className="w-full h-64">
+              <Line data={powerData} options={powerChartOptions} />
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="w-full h-64">
-            <Line data={voltageData} options={voltageChartOptions} />
+      )}
+
+      {results && (
+        <div className="mt-10 w-full max-w-lg">
+          <h1 className="text-2xl font-bold mb-5 text-center text-purple-300">Chat</h1>
+          <div className="mb-4">
+            <div className="bg-gray-700 p-4 rounded-md max-h-64 overflow-y-auto">
+              {chatHistory.map((message, index) => (
+                <div key={index} className={`mb-2 ${message.role === "user" ? "text-right" : "text-left"}`}>
+                  <div className={`inline-block p-2 rounded-md ${message.role === "user" ? "bg-blue-500" : "bg-gray-600"}`}>
+                    <p>{message.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="w-full h-64">
-            <Line data={currentData} options={currentChartOptions} />
-          </div>
-          <div className="w-full h-64">
-            <Line data={powerData} options={powerChartOptions} />
-          </div>
+          <form onSubmit={handleChatSubmit}>
+            <input
+              className="w-full p-2 bg-gray-700 border border-gray-500 rounded text-yellow-300 mb-2"
+              type="text"
+              placeholder="Escribe tu mensaje..."
+              onChange={handleChatInputChange}  // Usamos la función debounced para manejar la entrada
+            />
+            <button
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full"
+              type="submit"
+            >
+              Enviar
+            </button>
+          </form>
         </div>
-      </div>
+      )}
     </div>
   );
 }
