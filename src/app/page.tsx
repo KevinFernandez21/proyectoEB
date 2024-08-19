@@ -112,7 +112,7 @@ export default function Home() {
     e.preventDefault();
     if (!userMessage || !results) return;
 
-    const newChatHistory = [...chatHistory, { role: "user", content: userMessage }];
+    const newChatHistory: ChatMessage[] = [...chatHistory, { role: "user", content: userMessage }];
     setChatHistory(newChatHistory);
 
     try {
