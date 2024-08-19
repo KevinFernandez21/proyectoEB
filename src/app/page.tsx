@@ -101,7 +101,7 @@ export default function Home() {
     let powers = [];
 
     // Disminuye el incremento para generar más puntos
-    for (let R = 1; R <= resistanceMax; R += 10) {  // Incrementa de 10 en 10 para más puntos
+    for (let R = 1; R <= resistanceMax; R += 1) {  // Incrementa de 1 en 1 para más puntos
         const I = voltage / R;
         const P = voltage * I;
 
@@ -144,7 +144,7 @@ export default function Home() {
 
   const graphData = getGraphData();
 
-  const voltageChartOptions = {
+  const chartOptions = (maxValue: number, minValue: number = 0) => ({
     responsive: true,
     plugins: {
       legend: {
@@ -168,8 +168,8 @@ export default function Home() {
         }
       },
       y: {
-        min: 0,
-        max: Math.max(...graphData.voltages) * 1.2,
+        min: minValue,
+        max: maxValue,
         title: {
           display: true,
           text: 'Valor',
@@ -177,6 +177,7 @@ export default function Home() {
         },
         ticks: {
           color: '#ffffff',
+          stepSize: maxValue / 20,  // Aumenta la cantidad de ticks en el eje Y
         }
       }
     },
@@ -188,29 +189,11 @@ export default function Home() {
         radius: 0, // Hide points for a cleaner look
       }
     }
-  };
+  });
 
-  const currentChartOptions = {
-    ...voltageChartOptions,
-    scales: {
-      ...voltageChartOptions.scales,
-      y: {
-        ...voltageChartOptions.scales.y,
-        max: Math.max(...graphData.currents) * 1.2,
-      }
-    }
-  };
-
-  const powerChartOptions = {
-    ...voltageChartOptions,
-    scales: {
-      ...voltageChartOptions.scales,
-      y: {
-        ...voltageChartOptions.scales.y,
-        max: Math.max(...graphData.powers) * 1.2,
-      }
-    }
-  };
+  const voltageChartOptions = chartOptions(Math.max(...graphData.voltages) * 1.2);
+  const currentChartOptions = chartOptions(Math.max(...graphData.currents) * 1.2);
+  const powerChartOptions = chartOptions(Math.max(...graphData.powers) * 1.2);
 
   const voltageData = {
     labels: graphData.resistances,

@@ -1,7 +1,19 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from sympy import symbols, Matrix
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
+import google.generativeai as genai
+
+# Cargar el archivo .env
+load_dotenv()
+
+# Configurar la API key para genai
+api_key = os.getenv('GEMINI_API_KEY')
+if not api_key:
+    raise ValueError("API_KEY no encontrada en las variables de entorno")
+genai.configure(api_key=api_key)
 
 app = FastAPI()
 
@@ -32,6 +44,10 @@ class InputValues(BaseModel):
     V1: float
     V2: float
     V3: float
+
+class ChatMessage(BaseModel):
+    message: str
+    results: dict
 
 @app.post("/calculate")
 def calculate(values: InputValues):
@@ -87,6 +103,42 @@ def calculate(values: InputValues):
     }
 
     return response
+
+@app.post("/chat")
+def chat_with_model(chat_message: ChatMessage):
+    # Usar los resultados que se pasan en la solicitud
+    results = chat_message.results
+
+    # Construir el contexto usando los resultados proporcionados
+    context = f"""
+    Hemos calculado los siguientes valores eléctricos:
+    VR1: {results.get('VR1')},
+    VR2: {results.get('VR2')},
+    VR3: {results.get('VR3')},
+    VR4: {results.get('VR4')},
+    VR5: {results.get('VR5')},
+    IAC: {results.get('IAC')},
+    IAB: {results.get('IAB')},
+    IBC: {results.get('IBC')},
+    IAD: {results.get('IAD')},
+    IDC: {results.get('IDC')},
+    IBD: {results.get('IBD')}.
+
+    Responde solo en el contexto de electricidad y estos valores.
+    """
+
+    # Inicializar el modelo generativo con un contexto específico en español
+    model=genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=context)
+    chat = model.start_chat(
+        history=[
+            {"role": "user", "parts": "Hola"},
+            {"role": "model", "parts": "Encantado de conocerte. Puedo ayudarte con cualquier consulta relacionada con los cálculos que has proporcionado."},
+        ]
+    )
+    response = chat.send_message(chat_message.message)
+    return {"response": response.text}
 
 if __name__ == "__main__":
     import uvicorn

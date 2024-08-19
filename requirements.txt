@@ -2,3 +2,6 @@ fastapi
 uvicorn
 numpy
 sympy
+google-generativeai
+google-ai-generativelanguage
+python-dotenv
